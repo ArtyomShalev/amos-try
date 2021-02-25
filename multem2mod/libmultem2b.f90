@@ -11,6 +11,9 @@ module libmultem2b
     complex(dp), parameter, public :: cone = (1.0_dp, 0.0_dp)
     complex(dp), parameter, public :: ctwo = (2.0_dp, 0.0_dp)
     real(dp), parameter, public :: pi = 4.0_dp * ATAN(1.0_dp)
+    integer, dimension(1), parameter :: multipole_order = (/-1/), multipole_type = (/-1/)
+    logical, parameter :: is_z_oriented = .false.
+
     public main_evaluate
 contains
     !=======================================================================
@@ -629,6 +632,8 @@ contains
                 xxmat2((lmax + 1)**2 - 1, (lmax + 1)**2 - 1)
         complex(dp) dlme(2, (lmax + 1)**2), dlmh(2, (lmax + 1)**2)
         !     ------------------------------------------------------------------
+        bmel1 = czero
+        bmel2 = czero
         igkmax = 2 * igmax
         lmax1 = lmax + 1
         lmtot = lmax1 * lmax1 - 1
@@ -660,6 +665,9 @@ contains
                 iod = 0
                 do l = 1, lmax
                     do m = -l, l
+                        if (is_z_oriented .and. m /= 0) then
+                            cycle
+                        end if
                         ii = ii + 1
                         if(mod((l + m), 2)==0)  then
                             iev = iev + 1
@@ -1430,8 +1438,15 @@ complex(dp) omega1, omega2, z1, z2, z3
         signus = 1.0_dp
         iaod = 0
         iaev = lmxod
+
+!set xmatt1 xmatt2 to czeros
+        xxmat1 = czero
+        xxmat2 = czero
         do la = 1, lmax
             do ma = -la, la
+                if (is_z_oriented .and. ma /= 0) then
+                    cycle
+                end if
                 if(mod((la + ma), 2)==0) then
                     iaev = iaev + 1
                     ia = iaev
@@ -1455,6 +1470,9 @@ complex(dp) omega1, omega2, z1, z2, z3
                 ibev = lmxod
                 do lb = 1, lmax
                     do mb = -lb, lb
+                        if (is_z_oriented .and. mb /= 0) then
+                            cycle
+                        end if
                         if(mod((lb + mb), 2)==0) then
                             ibev = ibev + 1
                             ib = ibev
@@ -1991,7 +2009,8 @@ complex(dp) omega1, omega2, z1, z2, z3
         !     w(z)=exp(-z**2)*(1.0-erf(-i*z))
         complex(dp), intent(in) :: z
         real(dp) :: relerr = 1e-16_dp
-!        cerf = exp(-z**2) * (1.0 - erf_pop(-ci * z))
+        !        cerf = exp(-z**2) * (1.0 - erf_pop(-ci * z))
+!        cerf = wpop(z)
         cerf = faddeeva_w(z, relerr)
         return
     end function
@@ -2617,12 +2636,33 @@ complex(dp) omega1, omega2, z1, z2, z3
         !     ------------------------------------------------------------------
         complex(dp), intent(in) :: EPSSPH, EPSMED, MUSPH, MUMED, RAP
         complex(dp), intent(out) :: TE(:), TH(:)
+        !        ! multipole_order: -1 for all orders of the multipoles
+        !        !-----------------------------------------------------------------------
+        !        integer, intent(in) :: multipole_order(:)
+        !        ! multipole_type: -1 for both electric and magnetic
+        !        !                  0 for electric
+        !        !                  1 for magnetic
+        !        integer, intent(in) :: multipole_type(:)
+        !        !-----------------------------------------------------------------------
         ! local
-        INTEGER :: l1, lmax, lmax1, b_size
+        INTEGER :: l1, lmax, lmax1, b_size, s
         complex(dp) :: C1, C2, C3, C4, C5, C6, AN, AJ, BN, BJ, ARG, ARGM, XISQ, XISQM, AR
         complex(dp), allocatable :: J(:), Y(:), H(:), JM(:), YM(:), HM(:)
+        integer :: multipole_selector
+!        integer, allocatable :: multipole_order(:), multipole_type(:)
         !-----------------------------------------------------------------------
+!        multipole_order = (/ 1 /)
+!        multipole_type = (/  0/)
+!        multipole_order = (/ -1 /)
+!        multipole_type = (/  -1/)
         lmax1 = size(TE)
+        if (size(TH) < lmax1) then
+            print *, 'Error. TE and TH vectors have different sizes'
+            stop
+        end if
+        multipole_selector = size(multipole_type)
+        !multipole_type == -1, 0, 1 only
+        !multipole_order /=0?depends on indices lmax, >-1, <=lmax same on indices
         ! to evaluate TE(0..lmax) we need one more oder in Bessel functions
         b_size = lmax1 + 1
         allocate(J (1:b_size)); allocate(Y (1:b_size)); allocate(H (1:b_size))
@@ -2634,13 +2674,40 @@ complex(dp) omega1, omega2, z1, z2, z3
         call bessel(J, Y, H, arg);  call bessel(JM, YM, HM, argm)
         c1 = epssph - epsmed;   c2 = epsmed * argm;   c3 = -epssph * arg
         c4 = musph - mumed;   c5 = mumed * argm;   c6 = -musph * arg
+        !set all TE TH to czero
+        TE = czero
+        TH = czero
         do  L1 = 1, LMAX1
-            an = C1 * L1 * JM(L1) * Y(L1) + C2 * JM(L1 + 1) * Y(L1) + C3 * JM(L1) * Y(L1 + 1)
-            aj = C1 * L1 * JM(L1) * J(L1) + C2 * JM(L1 + 1) * J(L1) + C3 * JM(L1) * J(L1 + 1)
-            bn = C4 * L1 * JM(L1) * Y(L1) + C5 * JM(L1 + 1) * Y(L1) + C6 * JM(L1) * Y(L1 + 1)
-            bj = C4 * L1 * JM(L1) * J(L1) + C5 * JM(L1 + 1) * J(L1) + C6 * JM(L1) * J(L1 + 1)
-            TE(L1) = -aj / (aj + ci * an)
-            TH(L1) = -bj / (bj + ci * bn)
+
+            do s = 1, multipole_selector
+                if (L1 /= multipole_order(s) .and. multipole_order(s) /= -1) then
+                    cycle
+                end if
+
+
+                if (multipole_type(s) == 0 .or. multipole_type(s) == -1) then
+                    an = C1 * L1 * JM(L1) * Y(L1) + C2 * JM(L1 + 1) * Y(L1) + C3 * JM(L1) * Y(L1 + 1)
+                    aj = C1 * L1 * JM(L1) * J(L1) + C2 * JM(L1 + 1) * J(L1) + C3 * JM(L1) * J(L1 + 1)
+                    TE(L1) = -aj / (aj + ci * an)
+                end if
+
+                if (multipole_type(s) == 1 .or. multipole_type(s) == -1) then
+                    bn = C4 * L1 * JM(L1) * Y(L1) + C5 * JM(L1 + 1) * Y(L1) + C6 * JM(L1) * Y(L1 + 1)
+                    bj = C4 * L1 * JM(L1) * J(L1) + C5 * JM(L1 + 1) * J(L1) + C6 * JM(L1) * J(L1 + 1)
+                    TH(L1) = -bj / (bj + ci * bn)
+                end if
+            end do
+
+
+            !            an = C1 * L1 * JM(L1) * Y(L1) + C2 * JM(L1 + 1) * Y(L1) + C3 * JM(L1) * Y(L1 + 1)
+            !            aj = C1 * L1 * JM(L1) * J(L1) + C2 * JM(L1 + 1) * J(L1) + C3 * JM(L1) * J(L1 + 1)
+            !            bn = C4 * L1 * JM(L1) * Y(L1) + C5 * JM(L1 + 1) * Y(L1) + C6 * JM(L1) * Y(L1 + 1)
+            !            bj = C4 * L1 * JM(L1) * J(L1) + C5 * JM(L1 + 1) * J(L1) + C6 * JM(L1) * J(L1 + 1)
+            !            TE(L1) = -aj / (aj + ci * an)
+            !            TH(L1) = -bj / (bj + ci * bn)
+
+
+
         end do
         return
     end subroutine
