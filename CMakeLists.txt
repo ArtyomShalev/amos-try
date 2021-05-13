@@ -61,7 +61,7 @@ set(common "-std=f2008")
 set(CMAKE_BUILD_TYPE Release
             CACHE STRING "Build type (Debug, Release)" FORCE)
 #set(CMAKE_Fortran_FLAGS_RELEASE "${common} -O3 -march=native -ffast-math -funroll-loops -mtune=native -fopenmp" )
-set(CMAKE_Fortran_FLAGS_RELEASE "${common} -O3 -march=native -ffast-math -funroll-loops -mtune=native" )
+set(CMAKE_Fortran_FLAGS_RELEASE "${common} -g -O3 -march=native -ffast-math -funroll-loops -mtune=native" )
 
 #add_subdirectory(cylinder)
 

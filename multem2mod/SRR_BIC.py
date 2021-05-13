@@ -50,7 +50,7 @@ def create_input(npts, ak1, ak2, zinf, zsup, polar, lmax, r_ratio, rmax, epssph_
 
 
 def eval(i):
-    create_input(npts, ak1[i]/2/np.pi*a, ak2/2/np.pi*a, zinf/a, zsup/a, polar, lmax, r_ratio, rmax, epssph_re, epssph_im,
+    create_input(npts, ak1[i], ak2, zinf/a, zsup/a, polar, lmax, r_ratio, rmax, epssph_re, epssph_im,
                  type, order, is_multipole_type_selected, is_multipole_order_selected, is_m_projection_selected)
     if os.path.isfile('multem2'):
         my_env = os.environ.copy()
@@ -72,20 +72,25 @@ lmax = 1
 rmax = 5
 a = 300
 s = 180
+# a = 600
+# s = 300
 r_ratio = s/a
 npts = 500
 polar='S' # S or P
 
 lambda_resonance = 1500
-# band_factor = 2
-zinf = 0.1*lambda_resonance
-zsup = 2*lambda_resonance
+zinf = 0.9*lambda_resonance
+zsup = 1.2*lambda_resonance
+# zinf = 600
+# zsup = 1500
 epssph_re = 16.0
-epssph_im = 0.1
+epssph_im = 0.0
+# epssph_re = 12.0
+# epssph_im = 0.0
 
 ak2 = 0
 from_ak1 = 0.0
-to_ak1 = 0.25*np.pi/a
+to_ak1 = 0.5
 n_ak1 = 100
 ak1 = np.linspace(from_ak1, to_ak1, n_ak1)
 kpts = len(ak1)
@@ -117,7 +122,8 @@ R[R<1e-22] = 1e-22
 # c = 3e17
 # omega_resonance = 2*np.pi*c / (lambda_resonance*a)
 # y = 2*np.pi*c / (data[1, 0, :]*a) / omega_resonance
-kx = ak1*a/np.pi
+kx = ak1*2
+
 lambda_arr = data[1, 0, :]*a
 plt.imshow(R, extent = (np.amin(kx), np.amax(kx), np.amin(lambda_arr), np.amax(lambda_arr)), cmap=cm.hot, norm=LogNorm(), aspect='auto')
 plt.colorbar()
